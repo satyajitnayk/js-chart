@@ -46,6 +46,13 @@ math.subtract = (p1, p2) => {
   ];
 }
 
+math.scale = (p, scalar) => {
+  return [
+    p[0] * scalar,
+    p[1] * scalar
+  ];
+}
+
 math.formatNumber = (n, dec = 0) => {
   return n.toFixed(dec);
 }
