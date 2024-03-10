@@ -1,10 +1,11 @@
 class Chart {
-  constructor(container, samples, options) {
+  constructor(container, samples, options, onClick = null) {
     this.samples = samples;
 
     this.axesLabels = options.axesLabels;
     this.styles = options.styles;
     this.icon = options.icon;
+    this.onClick = onClick;
 
     this.canvas = document.createElement('canvas');
     this.canvas.width = options.size;
@@ -14,8 +15,8 @@ class Chart {
 
     this.ctx = this.canvas.getContext('2d');
 
-    this.margin = options.size * 0.1;
-    this.transparency = 0.7;
+    this.margin = options.size * 0.11;
+    this.transparency = options.transparency || 1;
 
     this.dataTrans = {
       offset: [0, 0],
@@ -46,6 +47,8 @@ class Chart {
       const dataLoc = this.#getMouse(evt, true);
       dragInfo.start = dataLoc;
       dragInfo.dragging = true;
+      dragInfo.end = [0, 0];
+      dragInfo.offset = [0, 0];
     }
     canvas.onmousemove = (evt) => {
       if (dragInfo.dragging) {
@@ -55,7 +58,7 @@ class Chart {
           math.subtract(
             dragInfo.start, dragInfo.end
           ),
-          dataTrans.scale
+          dataTrans.scale ** 2
         );
         const newOffset = math.add(
           dragInfo.offset,
@@ -89,6 +92,7 @@ class Chart {
         dragInfo.offset
       );
       dragInfo.dragging = false;
+
     }
     canvas.onwheel = (evt) => {
       const direction = Math.sign(evt.deltaY);
@@ -104,8 +108,29 @@ class Chart {
       this.#draw();
       evt.preventDefault();
     }
+    canvas.onclick = () => {
+      // prevent selection while dragging
+      if (!math.equals(dragInfo.offset, [0, 0])) {
+        return;
+      }
+      if (this.hoveredSample) {
+        // deselect
+        if (this.selectedSample === this.hoveredSample) {
+          this.selectedSample = null;
+        } else {
+          this.selectedSample = this.hoveredSample;
+        }
+      } else {
+        this.selectedSample = null;
+      }
+      if (this.onClick) {
+        this.onClick(
+          this.selectedSample,
+        );
+      }
+      this.#draw();
+    }
   }
-
 
   #updateDataBounds(offset, scale) {
     const {dataBounds, defaultDataBounds: def} = this;
@@ -191,7 +216,6 @@ class Chart {
     const {ctx, canvas} = this;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    this.#drawAxes();
     ctx.globalAlpha = this.transparency;
     this.#drawSamples(this.samples);
     ctx.globalAlpha = 1;
@@ -201,6 +225,19 @@ class Chart {
         this.hoveredSample
       );
     }
+
+    if (this.selectedSample) {
+      this.#emphasizeSample(
+        this.selectedSample, 'yellow'
+      );
+    }
+
+    this.#drawAxes();
+  }
+
+  selectSample(sample) {
+    this.selectedSample = sample;
+    this.#draw();
   }
 
   #emphasizeSample(sample, color = "white") {
@@ -225,6 +262,11 @@ class Chart {
   #drawAxes() {
     const {ctx, canvas, axesLabels, margin} = this;
     const {left, right, top, bottom} = this.pixelBounds;
+
+    ctx.clearRect(0, 0, this.canvas.width, margin);
+    ctx.clearRect(0, 0, margin, this.canvas.height);
+    ctx.clearRect(this.canvas.width - margin, 0, margin, this.canvas.height);
+    ctx.clearRect(0, this.canvas.height - margin, this.canvas.width, margin);
 
     graphics.drawText(
       ctx,
